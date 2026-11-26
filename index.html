@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>적도 태평양 대기-해양 순환 탐구 시뮬레이션 (지구과학Ⅰ)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+KR:wght@400;500;700;800&display=swap" rel="stylesheet" />
+  <style>
+    body {
+      font-family: 'Noto Sans KR', 'Inter', sans-serif;
+      background-color: #0f172a;
+      color: #f8fafc;
+      overflow-x: hidden;
+    }
+    /* 커스텀 슬라이더 스타일 */
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      background: transparent;
+      cursor: pointer;
+    }
+    input[type="range"]::-webkit-slider-runnable-track {
+      height: 12px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #f97316 0%, #38bdf8 50%, #3b82f6 100%);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      margin-top: -7px;
+      background-color: #ffffff;
+      height: 24px;
+      width: 24px;
+      border-radius: 50%;
+      border: 3px solid #0284c7;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+      transition: transform 0.15s ease;
+    }
+    input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.12);
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+  <!-- 상단 헤더 -->
+  <header class="bg-slate-900/90 border-b border-slate-800 px-4 py-3 sm:px-6 sticky top-0 z-30 backdrop-blur-md">
+    <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500 to-blue-700 flex items-center justify-center shadow-lg shadow-sky-900/40 shrink-0">
+          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-sky-500/20 text-sky-300 border border-sky-500/30">지구과학Ⅰ 탐구 시뮬레이션</span>
+          </div>
+          <h1 id="mainTitle" class="text-lg sm:text-xl font-extrabold text-white tracking-tight mt-0.5">
+            적도 태평양의 대기와 해양 순환 시뮬레이션
+          </h1>
+          <p class="text-xs text-slate-400 mt-0.5">
+            무역풍의 세기 변화에 따른 해수면 기울기, 수온약층 깊이, 구름의 위치 변화를 관찰해 봅시다.
+          </p>
+        </div>
+      </div>
+
+      <!-- 우측 컨트롤: 일시정지 & 초기화 버튼 -->
+      <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+        <button id="playPauseBtn" type="button" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs sm:text-sm font-bold text-slate-200 flex items-center gap-1.5 transition">
+          <span id="playPauseIcon">⏸</span>
+          <span id="playPauseText">일시정지</span>
+        </button>
+        <button id="resetBtn" type="button" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs sm:text-sm font-bold text-slate-200 flex items-center gap-1.5 transition">
+          <span>↺</span>
+          <span>초기화</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- 메인 콘텐츠 영역 -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 py-4 sm:px-6 flex flex-col gap-4">
+
+    <!-- 상단 제어 바: 무역풍 세기 조절 & 빠른 선택 버튼 -->
+    <section class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl">
+      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        
+        <!-- 빠른 선택 버튼 3개 -->
+        <div class="flex flex-col gap-1.5">
+          <span class="text-xs font-bold text-slate-400">변인 조작 (빠른 단계 선택)</span>
+          <div class="grid grid-cols-3 gap-2 sm:flex sm:items-center">
+            <button id="btnWeak" type="button" class="preset-btn px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold border transition-all flex items-center justify-center bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-750">
+              <span>① 무역풍 약화</span>
+            </button>
+            <button id="btnNormal" type="button" class="preset-btn px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold border transition-all flex items-center justify-center bg-sky-600 border-sky-400 text-white shadow-lg shadow-sky-900/40">
+              <span>② 평상시 (기준)</span>
+            </button>
+            <button id="btnStrong" type="button" class="preset-btn px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold border transition-all flex items-center justify-center bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-750">
+              <span>③ 무역풍 강화</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 무역풍 세기 슬라이더 -->
+        <div class="flex-1 max-w-2xl flex flex-col gap-1.5">
+          <div class="flex items-center justify-between">
+            <label for="windSlider" class="text-xs sm:text-sm font-bold text-slate-200">
+              동→서 무역풍 세기 조절: <span id="windStateLabel" class="text-sky-400 font-extrabold ml-1">평상시 기준 (50%)</span>
+            </label>
+            <span id="windSpeedVal" class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">풍속 기준: 1.0x</span>
+          </div>
+          <input id="windSlider" type="range" min="0" max="100" value="50" class="w-full" />
+          <div class="flex justify-between text-[11px] font-semibold text-slate-400 px-0.5">
+            <span>0% (매우 약함)</span>
+            <span>50% (평상시 기준)</span>
+            <span>100% (매우 강함)</span>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- 중앙 핵심 영역: 적도 태평양 연직 단면도 캔버스 -->
+    <section class="bg-slate-900 border border-slate-800 rounded-2xl p-3 sm:p-4 shadow-2xl flex flex-col gap-3">
+      <div class="flex flex-wrap items-center justify-between gap-2 px-1">
+        <div class="flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+          <h2 class="text-sm sm:text-base font-bold text-white">적도 태평양 동서 연직 단면 모식도 (실시간 시뮬레이션)</h2>
+        </div>
+        <!-- 시각 범례 -->
+        <div class="flex flex-wrap items-center gap-3 text-xs text-slate-300">
+          <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-gradient-to-r from-orange-500 to-red-500 inline-block"></span>따뜻한 표층수</span>
+          <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-blue-900 border border-blue-500 inline-block"></span>차가운 심층수</span>
+          <span class="flex items-center gap-1.5"><span class="w-4 h-0.5 border-t-2 border-dashed border-amber-300 inline-block"></span>수온약층 경계</span>
+          <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-emerald-400 inline-block"></span>영양염류</span>
+        </div>
+      </div>
+
+      <!-- 반응형 캔버스 컨테이너 -->
+      <div id="canvasContainer" class="relative w-full h-[360px] sm:h-[430px] lg:h-[460px] rounded-xl overflow-hidden border border-slate-700/80 bg-slate-950">
+        <canvas id="ensoCanvas"></canvas>
+      </div>
+    </section>
+
+    <!-- 하단 관측 데이터 대시보드 (탐구 활동지 기록용) -->
+    <section class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      
+      <!-- 서태평양 관측 카드 -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-lg flex flex-col justify-between gap-3">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-2.5">
+          <div class="flex items-center gap-2">
+            <span class="px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 text-xs font-extrabold border border-amber-500/30">서태평양 (LEFT)</span>
+            <h3 class="text-base sm:text-lg font-extrabold text-white">인도네시아 · 오스트레일리아 부근</h3>
+          </div>
+          <span id="westWeatherBadge" class="px-2.5 py-1 rounded-full text-xs font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">저기압 · 강수 활발</span>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div class="bg-slate-950/70 rounded-xl p-3 border border-slate-800/80">
+            <div class="text-xs text-slate-400 font-medium">표층 수온 (평년 편차)</div>
+            <div class="mt-1 flex items-baseline gap-2">
+              <span id="westTemp" class="text-xl sm:text-2xl font-extrabold text-orange-400">29.0℃</span>
+              <span id="westTempAnomaly" class="text-xs font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">0.0℃</span>
+            </div>
+          </div>
+          <div class="bg-slate-950/70 rounded-xl p-3 border border-slate-800/80">
+            <div class="text-xs text-slate-400 font-medium">수온약층 깊이</div>
+            <div id="westThermocline" class="mt-1 text-lg sm:text-xl font-extrabold text-sky-300">깊음 (약 180m)</div>
+          </div>
+          <div class="bg-slate-950/70 rounded-xl p-3 border border-slate-800/80">
+            <div class="text-xs text-slate-400 font-medium">연직 기류 및 해수면 기압</div>
+            <div id="westPressure" class="mt-1 text-sm sm:text-base font-bold text-slate-100">상승 기류 (저기압 발달)</div>
+          </div>
+          <div class="bg-slate-950/70 rounded-xl p-3 border border-slate-800/80">
+            <div class="text-xs text-slate-400 font-medium">주요 기상 현상</div>
+            <div id="westClimate" class="mt-1 text-sm sm:text-base font-bold text-emerald-300">평년 수준 강수 유지</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 동태평양 관측 카드 -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-lg flex flex-col justify-between gap-3">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-2.5">
+          <div class="flex items-center gap-2">
+            <span class="px-2.5 py-1 rounded-lg bg-sky-500/20 text-sky-300 text-xs font-extrabold border border-sky-500/30">동태평양 (RIGHT)</span>
+            <h3 class="text-base sm:text-lg font-extrabold text-white">남아메리카 페루 연안</h3>
+          </div>
+          <span id="eastWeatherBadge" class="px-2.5 py-1 rounded-full text-xs font-bold bg-sky-500/20 text-sky-300 border border-sky-500/30">고기압 · 건조함</span>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div class="bg-slate-950/70 rounded-xl p-3 border border-slate-800/80">
+            <div class="text-xs text-slate-400 font-medium">표층 수온 (평년 편차)</div>
+            <div class="mt-1 flex items-baseline gap-2">
+              <span id="eastTemp" class="text-xl sm:text-2xl font-extrabold text-sky-400">21.5℃</span>
+              <span id="eastTempAnomaly" class="text-xs font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">0.0℃</span>
+            </div>
+          </div>
+          <div class="bg-slate-950/70 rounded-xl p-3 border border-slate-800/80">
+            <div class="text-xs text-slate-400 font-medium">수온약층 깊이</div>
+            <div id="eastThermocline" class="mt-1 text-lg sm:text-xl font-extrabold text-sky-300">얕음 (약 40m)</div>
+          </div>
+          <div class="bg-slate-950/70 rounded-xl p-3 border border-slate-800/80">
+            <div class="text-xs text-slate-400 font-medium">심층 해수 상승 &amp; 어획량</div>
+            <div id="eastUpwelling" class="mt-1 text-sm sm:text-base font-bold text-emerald-300">심층 찬 해수 상승 (좋은 어장)</div>
+          </div>
+          <div class="bg-slate-950/70 rounded-xl p-3 border border-slate-800/80">
+            <div class="text-xs text-slate-400 font-medium">해수면 기압 및 기상 현상</div>
+            <div id="eastClimate" class="mt-1 text-sm sm:text-base font-bold text-slate-100">하강 기류 · 고기압(맑고 건조)</div>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <script>
+    (function () {
+      // DOM 요소 참조
+      const canvas = document.getElementById('ensoCanvas');
+      const ctx = canvas.getContext('2d');
+      const container = document.getElementById('canvasContainer');
+
+      const windSlider = document.getElementById('windSlider');
+      const windStateLabel = document.getElementById('windStateLabel');
+      const windSpeedVal = document.getElementById('windSpeedVal');
+
+      const btnWeak = document.getElementById('btnWeak');
+      const btnNormal = document.getElementById('btnNormal');
+      const btnStrong = document.getElementById('btnStrong');
+
+      const playPauseBtn = document.getElementById('playPauseBtn');
+      const playPauseIcon = document.getElementById('playPauseIcon');
+      const playPauseText = document.getElementById('playPauseText');
+      const resetBtn = document.getElementById('resetBtn');
+
+      // 관측 데이터 카드 DOM
+      const westWeatherBadge = document.getElementById('westWeatherBadge');
+      const westTemp = document.getElementById('westTemp');
+      const westTempAnomaly = document.getElementById('westTempAnomaly');
+      const westThermocline = document.getElementById('westThermocline');
+      const westPressure = document.getElementById('westPressure');
+      const westClimate = document.getElementById('westClimate');
+
+      const eastWeatherBadge = document.getElementById('eastWeatherBadge');
+      const eastTemp = document.getElementById('eastTemp');
+      const eastTempAnomaly = document.getElementById('eastTempAnomaly');
+      const eastThermocline = document.getElementById('eastThermocline');
+      const eastUpwelling = document.getElementById('eastUpwelling');
+      const eastClimate = document.getElementById('eastClimate');
+
+      // 시뮬레이션 상태 변수
+      let targetWind = 50;   // 목표 무역풍 세기 (0 ~ 100, 50 = 평상시)
+      let currentWind = 50;  // 부드러운 보간을 위한 현재 무역풍 값
+      let isPlaying = true;
+      let animTime = 0;
+      let lastTimestamp = 0;
+
+      // 입자 배열 (영양염류, 빗방울)
+      const nutrients = Array.from({ length: 26 }, (_, i) => ({
+        offsetX: (i % 7) * 0.14 + Math.random() * 0.08,
+        progress: Math.random(),
+        speed: 0.25 + Math.random() * 0.25,
+        size: 2.5 + Math.random() * 2
+      }));
+
+      const raindrops = Array.from({ length: 55 }, () => ({
+        rx: (Math.random() - 0.5) * 140,
+        ry: Math.random() * 140,
+        speed: 140 + Math.random() * 90,
+        len: 7 + Math.random() * 6
+      }));
+
+      // 캔버스 해상도 반응형 조정
+      function resizeCanvas() {
+        const rect = container.getBoundingClientRect();
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        canvas.width = Math.floor(rect.width * dpr);
+        canvas.height = Math.floor(rect.height * dpr);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+
+      window.addEventListener('resize', resizeCanvas);
+      resizeCanvas();
+
+      // 빠른 버튼 활성화 UI 갱신
+      function updatePresetButtons(val) {
+        const buttons = [
+          { el: btnWeak, active: val <= 25, activeClass: 'bg-orange-600 border-orange-400 text-white shadow-lg shadow-orange-900/40' },
+          { el: btnNormal, active: val > 25 && val < 75, activeClass: 'bg-sky-600 border-sky-400 text-white shadow-lg shadow-sky-900/40' },
+          { el: btnStrong, active: val >= 75, activeClass: 'bg-blue-600 border-blue-400 text-white shadow-lg shadow-blue-900/40' }
+        ];
+        const inactiveClass = 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-750';
+
+        buttons.forEach(b => {
+          b.el.className = `preset-btn px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold border transition-all flex items-center justify-center ${b.active ? b.activeClass : inactiveClass}`;
+        });
+      }
+
+      // 관측 데이터 대시보드 텍스트 업데이트 (순수 현상 중심 표현)
+      function updateDashboard(w) {
+        const norm = (w - 50) / 50;
+
+        // 상태 라벨 업데이트
+        let stateText = '';
+        let stateColor = 'text-sky-400';
+        if (w <= 25) {
+          stateText = `무역풍 약화 (${Math.round(w)}%)`;
+          stateColor = 'text-orange-400';
+        } else if (w >= 75) {
+          stateText = `무역풍 강화 (${Math.round(w)}%)`;
+          stateColor = 'text-blue-400';
+        } else {
+          stateText = `평상시 기준 (${Math.round(w)}%)`;
+          stateColor = 'text-sky-400';
+        }
+        windStateLabel.textContent = stateText;
+        windStateLabel.className = `${stateColor} font-extrabold ml-1`;
+
+        const speedFactor = (0.3 + (w / 50) * 0.7).toFixed(1);
+        windSpeedVal.textContent = `풍속 기준: ${speedFactor}x`;
+
+        // 수온 및 편차 계산
+        const wAnom = (norm * 0.8).toFixed(1);
+        const eAnom = (-norm * 2.6).toFixed(1);
+
+        const wTempVal = (29.0 + parseFloat(wAnom)).toFixed(1);
+        const eTempVal = (21.5 + parseFloat(eAnom)).toFixed(1);
+
+        westTemp.textContent = `${wTempVal}℃`;
+        westTempAnomaly.textContent = `${parseFloat(wAnom) > 0 ? '+' : ''}${wAnom}℃`;
+        westTempAnomaly.className = `text-xs font-bold px-1.5 py-0.5 rounded ${
+          parseFloat(wAnom) > 0.2 ? 'bg-rose-500/20 text-rose-300' : parseFloat(wAnom) < -0.2 ? 'bg-sky-500/20 text-sky-300' : 'bg-slate-800 text-slate-300'
+        }`;
+
+        eastTemp.textContent = `${eTempVal}℃`;
+        eastTempAnomaly.textContent = `${parseFloat(eAnom) > 0 ? '+' : ''}${eAnom}℃`;
+        eastTempAnomaly.className = `text-xs font-bold px-1.5 py-0.5 rounded ${
+          parseFloat(eAnom) > 0.3 ? 'bg-rose-500/20 text-rose-300' : parseFloat(eAnom) < -0.3 ? 'bg-blue-500/20 text-blue-300' : 'bg-slate-800 text-slate-300'
+        }`;
+
+        // 수온약층 깊이
+        const wDepth = Math.round(180 + norm * 45);
+        const eDepth = Math.round(40 - norm * 25 + (norm < 0 ? -norm * 75 : 0));
+        if (w <= 25) {
+          westThermocline.textContent = `얕아짐 (약 ${wDepth}m)`;
+          eastThermocline.textContent = `깊어짐 (약 ${eDepth}m)`;
+        } else if (w >= 75) {
+          westThermocline.textContent = `더 깊어짐 (약 ${wDepth}m)`;
+          eastThermocline.textContent = `매우 얕음 (약 ${eDepth}m)`;
+        } else {
+          westThermocline.textContent = `깊음 (약 ${wDepth}m)`;
+          eastThermocline.textContent = `얕음 (약 ${eDepth}m)`;
+        }
+
+        // 서태평양 기상/기압
+        if (w <= 25) {
+          westWeatherBadge.textContent = '기압 상승 · 건조';
+          westWeatherBadge.className = 'px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30';
+          westPressure.textContent = '기압 상승 (상승 기류 약화)';
+          westClimate.textContent = '강수 감소 · 건조한 날씨';
+          westClimate.className = 'mt-1 text-sm sm:text-base font-bold text-amber-300';
+        } else if (w >= 75) {
+          westWeatherBadge.textContent = '저기압 강화 · 강수 급증';
+          westWeatherBadge.className = 'px-2.5 py-1 rounded-full text-xs font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30';
+          westPressure.textContent = '강한 상승 기류 (기압 하강)';
+          westClimate.textContent = '강수량 급증 · 많은 비';
+          westClimate.className = 'mt-1 text-sm sm:text-base font-bold text-rose-300';
+        } else {
+          westWeatherBadge.textContent = '저기압 · 강수 활발';
+          westWeatherBadge.className = 'px-2.5 py-1 rounded-full text-xs font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30';
+          westPressure.textContent = '상승 기류 (저기압 발달)';
+          westClimate.textContent = '평년 수준 강수 유지';
+          westClimate.className = 'mt-1 text-sm sm:text-base font-bold text-emerald-300';
+        }
+
+        // 동태평양 심층수 상승 및 기상/기압
+        if (w <= 25) {
+          eastWeatherBadge.textContent = '기압 하강 · 비 증가';
+          eastWeatherBadge.className = 'px-2.5 py-1 rounded-full text-xs font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30';
+          eastUpwelling.textContent = '심층수 상승 약화 (어장 황폐화)';
+          eastUpwelling.className = 'mt-1 text-sm sm:text-base font-bold text-rose-300';
+          eastClimate.textContent = '상승 기류 유입 · 강수 증가';
+          eastClimate.className = 'mt-1 text-sm sm:text-base font-bold text-rose-300';
+        } else if (w >= 75) {
+          eastWeatherBadge.textContent = '고기압 강화 · 매우 건조';
+          eastWeatherBadge.className = 'px-2.5 py-1 rounded-full text-xs font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30';
+          eastUpwelling.textContent = '심층 찬 해수 상승 매우 활발';
+          eastUpwelling.className = 'mt-1 text-sm sm:text-base font-bold text-sky-300';
+          eastClimate.textContent = '하강 기류 강화 · 극심한 건조';
+          eastClimate.className = 'mt-1 text-sm sm:text-base font-bold text-blue-300';
+        } else {
+          eastWeatherBadge.textContent = '고기압 · 건조함';
+          eastWeatherBadge.className = 'px-2.5 py-1 rounded-full text-xs font-bold bg-sky-500/20 text-sky-300 border border-sky-500/30';
+          eastUpwelling.textContent = '심층 찬 해수 상승 (좋은 어장)';
+          eastUpwelling.className = 'mt-1 text-sm sm:text-base font-bold text-emerald-300';
+          eastClimate.textContent = '하강 기류 · 고기압(맑고 건조)';
+          eastClimate.className = 'mt-1 text-sm sm:text-base font-bold text-slate-100';
+        }
+      }
+
+      // 화살표 그리기 헬퍼 함수
+      function drawArrow(x1, y1, x2, y2, color, lineWidth, headSize) {
+        const dx = x2 - x1;
+        const dy = y2 - y1;
+        const angle = Math.atan2(dy, dx);
+        const len = Math.hypot(dx, dy);
+        if (len < 6) return;
+
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.fillStyle = color;
+        ctx.lineWidth = lineWidth;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2 - Math.cos(angle) * (headSize * 0.6), y2 - Math.sin(angle) * (headSize * 0.6));
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(x2, y2);
+        ctx.lineTo(x2 - headSize * Math.cos(angle - Math.PI / 6), y2 - headSize * Math.sin(angle - Math.PI / 6));
+        ctx.lineTo(x2 - headSize * Math.cos(angle + Math.PI / 6), y2 - headSize * Math.sin(angle + Math.PI / 6));
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // 맑음(태양) 아이콘 그리기 헬퍼
+      function drawSun(cx, cy, radius) {
+        ctx.save();
+        ctx.translate(cx, cy);
+        const grad = ctx.createRadialGradient(0, 0, radius * 0.2, 0, 0, radius * 1.6);
+        grad.addColorStop(0, 'rgba(253, 224, 71, 0.95)');
+        grad.addColorStop(0.55, 'rgba(251, 191, 36, 0.45)');
+        grad.addColorStop(1, 'rgba(251, 191, 36, 0)');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(0, 0, radius * 1.6, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#fde047';
+        ctx.beginPath();
+        ctx.arc(0, 0, radius * 0.65, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // 적란운(비구름) 그리기 헬퍼
+      function drawCloud(cx, cy, scale, isDarkRain) {
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.scale(scale, scale);
+
+        // 구름 그림자/외곽
+        ctx.fillStyle = isDarkRain ? '#475569' : '#cbd5e1';
+        ctx.beginPath();
+        ctx.arc(-32, 8, 22, 0, Math.PI * 2);
+        ctx.arc(-10, -6, 28, 0, Math.PI * 2);
+        ctx.arc(20, -4, 25, 0, Math.PI * 2);
+        ctx.arc(38, 10, 19, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 구름 상단 밝은 하이라이트
+        ctx.fillStyle = isDarkRain ? '#94a3b8' : '#f8fafc';
+        ctx.beginPath();
+        ctx.arc(-28, 3, 18, 0, Math.PI * 2);
+        ctx.arc(-8, -11, 24, 0, Math.PI * 2);
+        ctx.arc(19, -8, 20, 0, Math.PI * 2);
+        ctx.arc(34, 6, 15, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 구름 하단 평탄부
+        ctx.fillStyle = isDarkRain ? '#334155' : '#94a3b8';
+        ctx.fillRect(-35, 8, 72, 16);
+
+        ctx.restore();
+      }
+
+      // 캔버스 전체 렌더링 루프
+      function render(dt) {
+        const W = container.clientWidth;
+        const H = container.clientHeight;
+        if (W === 0 || H === 0) return;
+
+        // 부드러운 상태 전환
+        currentWind += (targetWind - currentWind) * Math.min(1, dt * 6);
+        const norm = (currentWind - 50) / 50; // -1(약화) ~ 0(평상시) ~ +1(강화)
+        const windFactor = 0.25 + (currentWind / 50) * 0.75; // 0.25 ~ 1.75
+
+        // 레이아웃 기준 좌표
+        const landW = Math.max(58, W * 0.11);
+        const seaLeft = landW;
+        const seaRight = W - landW;
+        const seaW = seaRight - seaLeft;
+
+        const baseSeaY = H * 0.50; // 기준 해수면 높이
+        const seaBottomY = H - 24;
+
+        // 1. 하늘 배경 그라데이션
+        const skyGrad = ctx.createLinearGradient(0, 0, 0, baseSeaY);
+        skyGrad.addColorStop(0, '#091124');
+        skyGrad.addColorStop(1, '#172a4a');
+        ctx.fillStyle = skyGrad;
+        ctx.fillRect(0, 0, W, baseSeaY + 20);
+
+        // 대륙 상공 방위 표기
+        ctx.save();
+        ctx.font = '700 12px "Noto Sans KR", sans-serif';
+        ctx.fillStyle = 'rgba(148, 163, 184, 0.7)';
+        ctx.textAlign = 'left';
+        ctx.fillText('◀ 서쪽 (W)', 14, 22);
+        ctx.textAlign = 'right';
+        ctx.fillText('동쪽 (E) ▶', W - 14, 22);
+        ctx.restore();
+
+        // 2. 해수면 기울기 및 수온약층 깊이 계산
+        // 평상시(norm=0): 서쪽 해수면이 약간 높고(-10px), 동쪽이 낮음(+10px)
+        const tilt = 10 + norm * 8; // 약화: 2px, 평상시: 10px, 강화: 18px
+        const westSurfaceY = baseSeaY - tilt;
+        const eastSurfaceY = baseSeaY + tilt;
+
+        // 수온약층 깊이 (해수면으로부터의 거리)
+        const westThermoDepth = (seaBottomY - baseSeaY) * (0.62 + norm * 0.16); // 약화: 0.46, 평상시: 0.62, 강화: 0.78
+        const eastThermoDepth = (seaBottomY - baseSeaY) * (0.20 - norm * 0.10 + (norm < 0 ? -norm * 0.26 : 0)); // 약화: 0.56, 평상시: 0.20, 강화: 0.10
+
+        const westThermoY = westSurfaceY + westThermoDepth;
+        const eastThermoY = eastSurfaceY + eastThermoDepth;
+
+        // 3. 심층 찬 해수 영역 (전체 해양 바탕)
+        const deepGrad = ctx.createLinearGradient(0, baseSeaY, 0, seaBottomY);
+        deepGrad.addColorStop(0, '#0c4a6e');
+        deepGrad.addColorStop(1, '#082f49');
+        ctx.fillStyle = deepGrad;
+        ctx.beginPath();
+        ctx.moveTo(seaLeft, westSurfaceY);
+        ctx.lineTo(seaRight, eastSurfaceY);
+        ctx.lineTo(seaRight, seaBottomY);
+        ctx.lineTo(seaLeft, seaBottomY);
+        ctx.closePath();
+        ctx.fill();
+
+        // 4. 따뜻한 표층수 영역 (해수면 ~ 수온약층 경계)
+        const warmGrad = ctx.createLinearGradient(seaLeft, westSurfaceY, seaRight, eastSurfaceY);
+        if (norm < -0.3) {
+          warmGrad.addColorStop(0, '#f97316');
+          warmGrad.addColorStop(0.5, '#ef4444');
+          warmGrad.addColorStop(1, '#dc2626');
+        } else if (norm > 0.3) {
+          warmGrad.addColorStop(0, '#ef4444');
+          warmGrad.addColorStop(0.65, '#f97316');
+          warmGrad.addColorStop(1, '#0284c7');
+        } else {
+          warmGrad.addColorStop(0, '#ef4444');
+          warmGrad.addColorStop(0.75, '#f97316');
+          warmGrad.addColorStop(1, '#38bdf8');
+        }
+
+        ctx.fillStyle = warmGrad;
+        ctx.beginPath();
+        ctx.moveTo(seaLeft, westSurfaceY);
+        // 해수면 잔물결 표현
+        const waveSteps = 24;
+        for (let i = 1; i <= waveSteps; i++) {
+          const t = i / waveSteps;
+          const wx = seaLeft + seaW * t;
+          const wy = westSurfaceY + (eastSurfaceY - westSurfaceY) * t + Math.sin(animTime * 3 + t * 12) * 1.5;
+          ctx.lineTo(wx, wy);
+        }
+        // 수온약층 곡선 (S자 베지어 곡선으로 자연스러운 경계)
+        const cp1x = seaLeft + seaW * 0.38;
+        const cp1y = westThermoY;
+        const cp2x = seaLeft + seaW * 0.62;
+        const cp2y = eastThermoY;
+        ctx.bezierCurveTo(cp2x, cp2y, cp1x, cp1y, seaLeft, westThermoY);
+        ctx.closePath();
+        ctx.fill();
+
+        // 5. 수온약층 경계선 (점선 및 라벨)
+        ctx.save();
+        ctx.strokeStyle = '#fde047';
+        ctx.lineWidth = 2.5;
+        ctx.setLineDash([7, 5]);
+        ctx.beginPath();
+        ctx.moveTo(seaLeft, westThermoY);
+        ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, seaRight, eastThermoY);
+        ctx.stroke();
+        ctx.restore();
+
+        // 수온약층 라벨
+        ctx.save();
+        const midThermoX = seaLeft + seaW * 0.5;
+        const midThermoY = (westThermoY + eastThermoY) * 0.5;
+        ctx.font = '700 12px "Noto Sans KR", sans-serif';
+        ctx.fillStyle = '#fef08a';
+        ctx.textAlign = 'center';
+        ctx.fillText('수온약층 경계', midThermoX, midThermoY - 8);
+        ctx.restore();
+
+        // 해수면 하이라이트 라인
+        ctx.save();
+        ctx.strokeStyle = 'rgba(224, 242, 254, 0.75)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(seaLeft, westSurfaceY);
+        for (let i = 1; i <= waveSteps; i++) {
+          const t = i / waveSteps;
+          const wx = seaLeft + seaW * t;
+          const wy = westSurfaceY + (eastSurfaceY - westSurfaceY) * t + Math.sin(animTime * 3 + t * 12) * 1.5;
+          ctx.lineTo(wx, wy);
+        }
+        ctx.stroke();
+        ctx.restore();
+
+        // 6. 표층 해류 이동 화살표 (동 → 서)
+        const currentSpeed = 35 * windFactor;
+        const flowCount = 4;
+        for (let i = 0; i < flowCount; i++) {
+          const frac = ((i / flowCount) - (animTime * currentSpeed / seaW) % 1 + 1) % 1;
+          const fx = seaLeft + 35 + frac * (seaW - 70);
+          const surfY = westSurfaceY + (eastSurfaceY - westSurfaceY) * frac;
+          const arrowLen = 28 + windFactor * 16;
+          if (fx - arrowLen > seaLeft + 10) {
+            drawArrow(fx, surfY + 16, fx - arrowLen, surfY + 16, 'rgba(255, 255, 255, 0.85)', 2.5, 8);
+          }
+        }
+        ctx.save();
+        ctx.font = '700 11px "Noto Sans KR", sans-serif';
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        ctx.textAlign = 'center';
+        ctx.fillText('표층 해수의 이동', seaLeft + seaW * 0.45, (westSurfaceY + eastSurfaceY) * 0.5 + 34);
+        ctx.restore();
+
+        // 7. 동태평양 연안 심층 해수 상승 및 영양염류 애니메이션
+        const upwellingStrength = Math.max(0.15, 0.5 + norm * 0.5);
+        const upX = seaRight - 36;
+        const upBottom = seaBottomY - 16;
+        const upTop = eastSurfaceY + 22;
+
+        // 심층수 상승 화살표
+        const upArrowCount = norm < -0.3 ? 1 : norm > 0.3 ? 3 : 2;
+        for (let k = 0; k < upArrowCount; k++) {
+          const offsetX = upX - k * 24;
+          const pulse = Math.sin(animTime * (2.5 + upwellingStrength * 2) - k) * 5;
+          drawArrow(
+            offsetX,
+            upBottom,
+            offsetX,
+            upTop - pulse,
+            `rgba(125, 211, 252, ${0.45 + upwellingStrength * 0.5})`,
+            2 + upwellingStrength * 2,
+            8 + upwellingStrength * 3
+          );
+        }
+
+        // 영양염류 입자 상승
+        nutrients.forEach(p => {
+          p.progress = (p.progress + dt * p.speed * upwellingStrength) % 1;
+          const nx = seaRight - 14 - p.offsetX * 95;
+          const ny = upBottom - p.progress * (upBottom - upTop + 8);
+          ctx.save();
+          ctx.fillStyle = `rgba(52, 211, 153, ${0.35 + upwellingStrength * 0.65})`;
+          ctx.beginPath();
+          ctx.arc(nx, ny, p.size * (0.7 + upwellingStrength * 0.4), 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        });
+
+        // 심층 해수 상승 텍스트 라벨 (전문 용어 미노출)
+        ctx.save();
+        ctx.font = '700 12px "Noto Sans KR", sans-serif';
+        ctx.fillStyle = '#7dd3fc';
+        ctx.textAlign = 'right';
+        const upLabel = norm < -0.3 ? '찬 해수 상승 약화' : norm > 0.3 ? '찬 해수 상승 매우 활발' : '심층 찬 해수 상승';
+        ctx.fillText(upLabel, seaRight - 12, seaBottomY - 12);
+        ctx.restore();
+
+        // 8. 대륙 지형 (좌측: 서태평양 인도네시아/호주, 우측: 동태평양 페루/남아메리카)
+        // 좌측 대륙
+        ctx.save();
+        const westLandGrad = ctx.createLinearGradient(0, baseSeaY - 35, 0, H);
+        westLandGrad.addColorStop(0, '#4d7c0f');
+        westLandGrad.addColorStop(0.25, '#78350f');
+        westLandGrad.addColorStop(1, '#451a03');
+        ctx.fillStyle = westLandGrad;
+        ctx.beginPath();
+        ctx.moveTo(0, baseSeaY - 26);
+        ctx.lineTo(landW * 0.72, baseSeaY - 22);
+        ctx.lineTo(landW + 14, seaBottomY);
+        ctx.lineTo(0, seaBottomY);
+        ctx.closePath();
+        ctx.fill();
+
+        // 우측 대륙 (안데스 산맥 느낌의 가파른 경사)
+        const eastLandGrad = ctx.createLinearGradient(0, baseSeaY - 50, 0, H);
+        eastLandGrad.addColorStop(0, '#65a30d');
+        eastLandGrad.addColorStop(0.28, '#92400e');
+        eastLandGrad.addColorStop(1, '#451a03');
+        ctx.fillStyle = eastLandGrad;
+        ctx.beginPath();
+        ctx.moveTo(W, baseSeaY - 46);
+        ctx.lineTo(seaRight + landW * 0.25, baseSeaY - 32);
+        ctx.lineTo(seaRight - 12, seaBottomY);
+        ctx.lineTo(W, seaBottomY);
+        ctx.closePath();
+        ctx.fill();
+
+        // 해저 바닥 지각
+        ctx.fillStyle = '#292524';
+        ctx.fillRect(0, seaBottomY, W, H - seaBottomY);
+        ctx.restore();
+
+        // 대륙 이름 라벨
+        ctx.save();
+        ctx.font = '800 12px "Noto Sans KR", sans-serif';
+        ctx.fillStyle = '#fef3c7';
+        ctx.textAlign = 'center';
+        ctx.fillText('서태평양', landW * 0.45, baseSeaY + 26);
+        ctx.font = '500 11px "Noto Sans KR", sans-serif';
+        ctx.fillStyle = '#fde68a';
+        ctx.fillText('인도네시아', landW * 0.45, baseSeaY + 42);
+
+        ctx.font = '800 12px "Noto Sans KR", sans-serif';
+        ctx.fillStyle = '#fef3c7';
+        ctx.fillText('동태평양', W - landW * 0.45, baseSeaY + 26);
+        ctx.font = '500 11px "Noto Sans KR", sans-serif';
+        ctx.fillStyle = '#fde68a';
+        ctx.fillText('페루 연안', W - landW * 0.45, baseSeaY + 42);
+        ctx.restore();
+
+        // 9. 대기 순환 (무역풍, 상층 반류, 상승/하강 기류, 구름 및 강수)
+        const topAirY = 48;
+        const botAirY = baseSeaY - 34;
+
+        // 상승 기류 중심 X 위치 계산:
+        // 평상시(norm=0) & 강화(norm>0): 서태평양 쪽 (seaLeft + seaW * 0.16)
+        // 약화(norm<0): 중앙~동태평양 쪽으로 이동 (최대 seaLeft + seaW * 0.72)
+        const riseX = norm < 0
+          ? seaLeft + seaW * (0.16 + (-norm) * 0.56)
+          : seaLeft + seaW * 0.15;
+
+        const westSinkX = seaLeft + seaW * 0.12;
+        const eastSinkX = seaRight - seaW * 0.14;
+
+        // 구름 및 강수 그리기 (상승 기류 상공)
+        const cloudY = topAirY + 26;
+        const cloudScale = W < 520 ? 0.85 : 1.15;
+
+        // 맑은 구역 태양 아이콘 표시
+        if (norm >= -0.25) {
+          drawSun(eastSinkX, topAirY - 4, 18);
+        } else {
+          drawSun(westSinkX, topAirY - 4, 18);
+        }
+
+        // 빗방울 애니메이션
+        ctx.save();
+        ctx.strokeStyle = 'rgba(125, 211, 252, 0.7)';
+        ctx.lineWidth = 1.6;
+        const rainSpan = botAirY - (cloudY + 18);
+        raindrops.forEach(r => {
+          r.ry = (r.ry + dt * r.speed) % Math.max(40, rainSpan);
+          const rx = riseX + r.rx * (W < 520 ? 0.65 : 0.9);
+          const ry = cloudY + 18 + r.ry;
+          if (rx > seaLeft && rx < seaRight) {
+            ctx.beginPath();
+            ctx.moveTo(rx, ry);
+            ctx.lineTo(rx - 3, ry + r.len);
+            ctx.stroke();
+          }
+        });
+        ctx.restore();
+
+        drawCloud(riseX, cloudY, cloudScale, true);
+
+        // 하층 무역풍 화살표 (동 → 서)
+        const tradeArrowThickness = 2.5 + windFactor * 2.2;
+        const tradeHead = 9 + windFactor * 3;
+        const tradeStartX = eastSinkX - 18;
+        const tradeEndX = riseX + 26;
+
+        if (tradeStartX - tradeEndX > 40) {
+          const segments = 3;
+          const segW = (tradeStartX - tradeEndX) / segments;
+          const shift = ((animTime * 55 * windFactor) % segW);
+          for (let s = 0; s < segments; s++) {
+            const ax1 = tradeStartX - s * segW - shift;
+            const ax2 = ax1 - segW * 0.68;
+            if (ax2 >= tradeEndX - 10 && ax1 <= tradeStartX + 10) {
+              drawArrow(ax1, botAirY, ax2, botAirY, '#fbbf24', tradeArrowThickness, tradeHead);
+            }
+          }
+        }
+
+        // 무역풍 라벨
+        ctx.save();
+        ctx.font = '800 13px "Noto Sans KR", sans-serif';
+        ctx.fillStyle = '#fde047';
+        ctx.textAlign = 'center';
+        const tradeLabel = norm < -0.3 ? '무역풍 (약화됨)' : norm > 0.3 ? '무역풍 (매우 강함)' : '무역풍 (동 → 서)';
+        ctx.fillText(tradeLabel, (tradeStartX + tradeEndX) * 0.5, botAirY - 12);
+        ctx.restore();
+
+        // 상층 바람 화살표 (서 → 동)
+        if (tradeStartX - tradeEndX > 40) {
+          const segments = 3;
+          const segW = (tradeStartX - tradeEndX) / segments;
+          const shift = ((animTime * 45 * windFactor) % segW);
+          for (let s = 0; s < segments; s++) {
+            const ax1 = tradeEndX + s * segW + shift;
+            const ax2 = ax1 + segW * 0.68;
+            if (ax2 <= tradeStartX + 10 && ax1 >= tradeEndX - 10) {
+              drawArrow(ax1, topAirY, ax2, topAirY, 'rgba(248, 113, 113, 0.85)', 2.5, 9);
+            }
+          }
+        }
+
+        // 무역풍 약화 시 서태평양 쪽 보조 순환 세포 표시
+        if (norm < -0.25 && riseX - westSinkX > 65) {
+          drawArrow(westSinkX + 16, botAirY, riseX - 24, botAirY, 'rgba(251, 191, 36, 0.7)', 2.2, 8);
+          drawArrow(riseX - 24, topAirY, westSinkX + 16, topAirY, 'rgba(248, 113, 113, 0.7)', 2.2, 8);
+          // 서태평양 하강 기류
+          drawArrow(westSinkX, topAirY + 14, westSinkX, botAirY - 6, '#60a5fa', 3, 10);
+        }
+
+        // 주 상승 기류 화살표 (빨간색 상향)
+        const risePulse = Math.sin(animTime * 4) * 4;
+        drawArrow(riseX, botAirY - 4, riseX, cloudY + 26 - risePulse, '#f87171', 3.5, 11);
+
+        // 동태평양 하강 기류 화살표 (파란색 하향)
+        const sinkStrength = Math.max(0.35, 0.65 + norm * 0.35);
+        drawArrow(eastSinkX, topAirY + 14, eastSinkX, botAirY - 4, '#60a5fa', 2.5 + sinkStrength * 2, 10);
+
+        // 10. 기압 배치 배지 (저기압 / 고기압)
+        ctx.save();
+        ctx.textAlign = 'center';
+
+        // 상승 구역 저기압 배지
+        ctx.fillStyle = 'rgba(225, 29, 72, 0.9)';
+        ctx.beginPath();
+        ctx.roundRect(riseX - 54, botAirY - 38, 108, 22, 6);
+        ctx.fill();
+        ctx.font = '800 11px "Noto Sans KR", sans-serif';
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText('상승 기류 (저기압)', riseX, botAirY - 23);
+
+        // 동태평양 기압 배지
+        const eastBadgeX = eastSinkX;
+        const eastBadgeText = norm < -0.3 ? '기압 하강 · 비 증가' : norm > 0.3 ? '기압 상승 · 강한 하강' : '하강 기류 (고기압)';
+        ctx.fillStyle = norm < -0.3 ? 'rgba(217, 119, 6, 0.9)' : 'rgba(2, 132, 199, 0.9)';
+        ctx.beginPath();
+        ctx.roundRect(eastBadgeX - 56, topAirY + 20, 112, 22, 6);
+        ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(eastBadgeText, eastBadgeX, topAirY + 35);
+
+        // 서태평양 기압 상승 배지 (무역풍 약화 시)
+        if (norm < -0.3) {
+          ctx.fillStyle = 'rgba(2, 132, 199, 0.9)';
+          ctx.beginPath();
+          ctx.roundRect(westSinkX - 52, topAirY + 20, 104, 22, 6);
+          ctx.fill();
+          ctx.fillStyle = '#ffffff';
+          ctx.fillText('기압 상승 (건조)', westSinkX, topAirY + 35);
+        }
+
+        ctx.restore();
+      }
+
+      // 메인 애니메이션 프레임 루프
+      function loop(timestamp) {
+        if (!lastTimestamp) lastTimestamp = timestamp;
+        const dt = Math.min(0.05, (timestamp - lastTimestamp) / 1000);
+        lastTimestamp = timestamp;
+
+        if (isPlaying) {
+          animTime += dt;
+        }
+        render(dt);
+        requestAnimationFrame(loop);
+      }
+
+      // 이벤트 리스너 등록
+      windSlider.addEventListener('input', (e) => {
+        targetWind = Number(e.target.value);
+        updatePresetButtons(targetWind);
+        updateDashboard(targetWind);
+      });
+
+      btnWeak.addEventListener('click', () => {
+        targetWind = 15;
+        windSlider.value = targetWind;
+        updatePresetButtons(targetWind);
+        updateDashboard(targetWind);
+      });
+
+      btnNormal.addEventListener('click', () => {
+        targetWind = 50;
+        windSlider.value = targetWind;
+        updatePresetButtons(targetWind);
+        updateDashboard(targetWind);
+      });
+
+      btnStrong.addEventListener('click', () => {
+        targetWind = 90;
+        windSlider.value = targetWind;
+        updatePresetButtons(targetWind);
+        updateDashboard(targetWind);
+      });
+
+      // 일시정지 / 재생 토글
+      playPauseBtn.addEventListener('click', () => {
+        isPlaying = !isPlaying;
+        playPauseIcon.textContent = isPlaying ? '⏸' : '▶';
+        playPauseText.textContent = isPlaying ? '일시정지' : '재생';
+      });
+
+      // 초기화 버튼
+      resetBtn.addEventListener('click', () => {
+        targetWind = 50;
+        windSlider.value = 50;
+        isPlaying = true;
+        playPauseIcon.textContent = '⏸';
+        playPauseText.textContent = '일시정지';
+        updatePresetButtons(50);
+        updateDashboard(50);
+      });
+
+      // 초기 UI 상태 설정 및 애니메이션 시작
+      updatePresetButtons(targetWind);
+      updateDashboard(targetWind);
+      window.onload = () => {
+        resizeCanvas();
+        requestAnimationFrame(loop);
+      };
+    })();
+  </script>
+</body>
+</html>
